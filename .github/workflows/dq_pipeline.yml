@@ -55,7 +55,7 @@ jobs:
         run: python -m spacy download en_core_web_sm
 
       - name: Set up DVC
-        uses: iterative/setup-dvc@v3
+        uses: iterative/setup-dvc@v1
 
       - name: Run ingestion stage
         run: echo "Ingestion stage placeholder - scripts not yet implemented"
