@@ -1,0 +1,50 @@
+stages:
+
+  # Stage 1: Pull raw data from all configured sources into data/raw/
+  ingest:
+    cmd: python src/ingestion/run_ingestion.py
+    deps:
+      - src/ingestion/
+      - dq_config.yaml
+    outs:
+      - data/raw/
+
+  # Stage 2: Run data-type-specific extractors and write normalised features to data/extracted/
+  extract:
+    cmd: python src/modules/run_extraction.py
+    deps:
+      - src/modules/
+      - data/raw/
+      - dq_config.yaml
+    outs:
+      - data/extracted/
+
+  # Stage 3: Run all quality checks against extracted data and emit per-dimension results
+  quality_check:
+    cmd: python src/modules/run_quality_checks.py
+    deps:
+      - src/modules/
+      - data/extracted/
+      - dq_config.yaml
+    outs:
+      - reports/quality_results.json
+
+  # Stage 4: Aggregate dimension results into weighted composite quality scores
+  score:
+    cmd: python src/scoring/scorer.py
+    deps:
+      - src/scoring/
+      - reports/quality_results.json
+      - dq_config.yaml
+    outs:
+      - reports/quality_scores.json
+
+  # Stage 5: Generate the CML markdown report from quality scores for CI/CD publication
+  report:
+    cmd: python src/reporting/cml_reporter.py
+    deps:
+      - src/reporting/
+      - reports/quality_scores.json
+      - dq_config.yaml
+    outs:
+      - reports/cml_report.md

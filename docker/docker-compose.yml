@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # api — the Flask data quality API.
+  #
+  # Build context is the project root (..) so the Dockerfile can COPY the
+  # full source tree. The dockerfile path is relative to the build context.
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    # -------------------------------------------------------------------------
+    # Port mapping — exposes the Flask API on host port 5000.
+    # Change the left-hand value to remap to a different host port, e.g.
+    # "8080:5000" if port 5000 is already in use on your machine.
+    # -------------------------------------------------------------------------
+    ports:
+      - "5000:5000"
+
+    # -------------------------------------------------------------------------
+    # Volumes — bind-mount host directories into the container so that data,
+    # reports, and logs produced at runtime persist on the host and are visible
+    # without rebuilding the image. dq_config.yaml is mounted as a single file
+    # so config changes take effect without a rebuild (restart required).
+    # -------------------------------------------------------------------------
+    volumes:
+      - ../data:/app/data
+      - ../reports:/app/reports
+      - ../logs:/app/logs
+      - ../dq_config.yaml:/app/dq_config.yaml
+
+    # -------------------------------------------------------------------------
+    # Environment variables — passed into the container at runtime.
+    # Add sensitive values (API keys, secrets) here only via a .env file;
+    # never commit secret values directly to docker-compose.yml.
+    # -------------------------------------------------------------------------
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+
+    # -------------------------------------------------------------------------
+    # Restart policy — the container restarts automatically after crashes or
+    # host reboots, but not if it is explicitly stopped with docker compose down.
+    # -------------------------------------------------------------------------
+    restart: unless-stopped

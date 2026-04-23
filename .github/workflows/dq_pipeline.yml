@@ -1,0 +1,173 @@
+name: Data Quality Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12"
+  # AWS secrets are optional — deployment steps are skipped until configured.
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Install dependencies and run the ingestion stage
+  # ---------------------------------------------------------------------------
+  setup-and-ingest:
+    name: Setup & Ingest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download spaCy English model
+        run: python -m spacy download en_core_web_sm
+
+      - name: Set up DVC
+        uses: iterative/setup-dvc@v1
+
+      - name: Run ingestion stage
+        continue-on-error: true
+        run: dvc repro ingest
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Extract features, run quality checks, and compute scores
+  # ---------------------------------------------------------------------------
+  quality-checks:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    needs: setup-and-ingest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run extract stage
+        continue-on-error: true
+        run: dvc repro extract
+
+      - name: Run quality_check stage
+        continue-on-error: true
+        run: dvc repro quality_check
+
+      - name: Run score stage
+        continue-on-error: true
+        run: dvc repro score
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Generate and publish the CML report as a PR comment
+  # ---------------------------------------------------------------------------
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    needs: quality-checks
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up CML
+        uses: iterative/setup-cml@v2
+
+      - name: Run report stage
+        continue-on-error: true
+        run: dvc repro report
+
+      - name: Post CML report to PR
+        run: |
+          if [ -f reports/cml_report.md ]; then
+            cml comment create reports/cml_report.md
+          else
+            echo "No report generated yet" | cml comment create -
+          fi
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Deploy to AWS ECS (placeholder — only runs on push to main)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: report
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: AWS deployment placeholder
+        run: |
+          echo "AWS deployment not yet configured - skipping"
+          echo "To enable deployment, add the following secrets to your repository:"
+          echo "  AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
+          echo "  ECR_REPOSITORY, ECS_CLUSTER, ECS_SERVICE"

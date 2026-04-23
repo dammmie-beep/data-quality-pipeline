@@ -1,0 +1,76 @@
+# Project metadata — name, version, and description shown in reports and API responses.
+project:
+  name: data-quality-pipeline
+  version: "1.0"
+  description: Automated data quality monitoring pipeline
+
+# Score thresholds — determine whether a dataset run is marked as pass, warn, or fail.
+thresholds:
+  pass_score: 80
+  warn_score: 65
+  fail_score: 64
+
+# Scoring weights — each dimension's contribution to the overall quality score (must sum to 1.0).
+scoring_weights:
+  completeness: 0.25
+  accuracy: 0.25
+  consistency: 0.15
+  freshness: 0.15
+  uniqueness: 0.10
+  validity: 0.10
+
+# Alerts — controls which notification channels are active and when alerts are triggered.
+alerts:
+  slack_enabled: false
+  email_enabled: false
+  github_issue_enabled: true
+  slack_webhook_url: ""
+  email_recipients: []
+  alert_on_score_below: 80
+
+# AWS — credentials-free configuration for S3, ECR, and ECS; set enabled: true to activate cloud features.
+aws:
+  region: us-east-1
+  s3_bucket: ""
+  ecr_repository: ""
+  ecs_cluster: ""
+  ecs_service: ""
+  enabled: false
+
+# Flask — host, port, and debug settings for the pipeline's REST API server.
+flask:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true
+
+# DVC — data versioning backend; set remote_enabled: true and configure s3_bucket above to use S3.
+dvc:
+  remote: s3
+  remote_enabled: false
+
+# Modules — toggles each data-type module on or off and lists its input source paths or URIs.
+modules:
+  structured:
+    enabled: true
+    sources: []
+  semi_structured:
+    enabled: true
+    sources: []
+  text:
+    enabled: true
+    sources: []
+  audio:
+    enabled: true
+    sources: []
+  image:
+    enabled: true
+    sources: []
+  video:
+    enabled: true
+    sources: []
+
+# Logging — controls log verbosity, whether logs are written to disk, and the output file path.
+logging:
+  level: INFO
+  log_to_file: true
+  log_file: logs/pipeline.log
