@@ -130,7 +130,10 @@ jobs:
         run: echo "Report stage placeholder - scripts not yet implemented"
 
       - name: Post CML report to PR
-        run: echo "## Data Quality Pipeline\nPhase 1 complete - modules coming soon" | cml comment create -
+        run: |
+          echo "## Data Quality Pipeline" > cml_report.md
+          echo "Phase 1 complete - modules coming soon" >> cml_report.md
+          cml comment create cml_report.md
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
