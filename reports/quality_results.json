@@ -1,0 +1,205 @@
+[
+  {
+    "dataset_name": "sample_orders",
+    "data_type": "structured",
+    "overall_score": 87.21,
+    "dimensions": {
+      "completeness": 99.43,
+      "accuracy": 100.0,
+      "consistency": 85.71,
+      "freshness": 100.0,
+      "uniqueness": 95.0,
+      "validity": 0.0
+    },
+    "failed_checks": [
+      {
+        "check": "mixed_type",
+        "column": "created_at",
+        "expected": "uniform dtype, not object",
+        "actual": "100% of values parseable as datetime",
+        "severity": "warning"
+      },
+      {
+        "check": "duplicate_rows",
+        "column": "dataset",
+        "expected": "duplicate_rate <= 1%",
+        "actual": "5.00%",
+        "severity": "warning"
+      },
+      {
+        "check": "non_unique_identifier",
+        "column": "order_id",
+        "expected": "all 100 values unique",
+        "actual": "5 repeated value(s)",
+        "severity": "error"
+      },
+      {
+        "check": "validity",
+        "column": "dataset",
+        "expected": "check to complete without error",
+        "actual": "Invalid comparison between dtype=datetime64[ns, UTC] and Timestamp",
+        "severity": "error"
+      }
+    ],
+    "metadata": {
+      "row_count": 100,
+      "column_count": 7,
+      "duplicate_rate": 0.05
+    },
+    "passed": true,
+    "run_timestamp": "2026-04-23T13:19:08.655105+00:00",
+    "source_path": "data/raw/sample_orders.csv"
+  },
+  {
+    "dataset_name": "sample_app",
+    "data_type": "semi_structured",
+    "overall_score": 92.53,
+    "dimensions": {
+      "completeness": 76.11,
+      "accuracy": 100.0,
+      "consistency": 90.0,
+      "freshness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0
+    },
+    "failed_checks": [
+      {
+        "check": "null_rate",
+        "column": "request_id",
+        "expected": "null_rate <= 10%",
+        "actual": "23.33%",
+        "severity": "warning"
+      },
+      {
+        "check": "null_rate",
+        "column": "raw_line",
+        "expected": "null_rate <= 10%",
+        "actual": "93.33%",
+        "severity": "error"
+      },
+      {
+        "check": "unexpected_key",
+        "column": "raw_line",
+        "expected": "field present in >= 10% of records",
+        "actual": "field present in < 10% of records",
+        "severity": "warning"
+      }
+    ],
+    "metadata": {
+      "record_count": 30,
+      "field_count": 6,
+      "max_nesting_depth": 1,
+      "format": "log",
+      "extracted_csv": "data/extracted/sample_app_extracted.csv"
+    },
+    "passed": true,
+    "run_timestamp": "2026-04-23T13:19:08.674730+00:00",
+    "source_path": "data/raw/sample_app.log"
+  },
+  {
+    "dataset_name": "sample_events",
+    "data_type": "semi_structured",
+    "overall_score": 94.4,
+    "dimensions": {
+      "completeness": 77.6,
+      "accuracy": 100.0,
+      "consistency": 100.0,
+      "freshness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0
+    },
+    "failed_checks": [
+      {
+        "check": "null_rate",
+        "column": "payload.referrer",
+        "expected": "null_rate <= 10%",
+        "actual": "38.00%",
+        "severity": "warning"
+      },
+      {
+        "check": "null_rate",
+        "column": "payload.item_id",
+        "expected": "null_rate <= 10%",
+        "actual": "46.00%",
+        "severity": "warning"
+      },
+      {
+        "check": "null_rate",
+        "column": "payload.amount",
+        "expected": "null_rate <= 10%",
+        "actual": "46.00%",
+        "severity": "warning"
+      },
+      {
+        "check": "null_rate",
+        "column": "payload.session_id",
+        "expected": "null_rate <= 10%",
+        "actual": "46.00%",
+        "severity": "warning"
+      },
+      {
+        "check": "null_rate",
+        "column": "payload.page",
+        "expected": "null_rate <= 10%",
+        "actual": "40.00%",
+        "severity": "warning"
+      }
+    ],
+    "metadata": {
+      "record_count": 50,
+      "field_count": 10,
+      "max_nesting_depth": 2,
+      "format": "jsonl",
+      "extracted_csv": "data/extracted/sample_events_extracted.csv"
+    },
+    "passed": true,
+    "run_timestamp": "2026-04-23T13:19:08.694445+00:00",
+    "source_path": "data/raw/sample_events.jsonl"
+  },
+  {
+    "dataset_name": "sample_users",
+    "data_type": "semi_structured",
+    "overall_score": 95.49,
+    "dimensions": {
+      "completeness": 90.36,
+      "accuracy": 100.0,
+      "consistency": 90.0,
+      "freshness": 100.0,
+      "uniqueness": 94.0,
+      "validity": 100.0
+    },
+    "failed_checks": [
+      {
+        "check": "null_rate",
+        "column": "temp_debug_field",
+        "expected": "null_rate <= 10%",
+        "actual": "96.00%",
+        "severity": "error"
+      },
+      {
+        "check": "unexpected_key",
+        "column": "temp_debug_field",
+        "expected": "field present in >= 10% of records",
+        "actual": "field present in < 10% of records",
+        "severity": "warning"
+      },
+      {
+        "check": "duplicate_records",
+        "column": "dataset",
+        "expected": "duplicate_rate <= 1%",
+        "actual": "6.00% (3 record(s))",
+        "severity": "warning"
+      }
+    ],
+    "metadata": {
+      "record_count": 50,
+      "field_count": 11,
+      "max_nesting_depth": 2,
+      "format": "json",
+      "extracted_csv": "data/extracted/sample_users_extracted.csv"
+    },
+    "passed": true,
+    "run_timestamp": "2026-04-23T13:19:08.717827+00:00",
+    "source_path": "data/raw/sample_users.json"
+  }
+]
