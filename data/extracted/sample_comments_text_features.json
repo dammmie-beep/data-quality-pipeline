@@ -1,0 +1,25 @@
+{
+  "dataset_name": "sample_comments",
+  "char_count": 6255,
+  "word_count": 784,
+  "sentence_count": 130,
+  "avg_word_length": 6.9796,
+  "language": "en",
+  "language_confidence": 1.0,
+  "special_char_ratio": 0.076259,
+  "whitespace_ratio": 0.12518,
+  "uppercase_ratio": 0.055599,
+  "entities": {
+    "DATE": 7,
+    "TIME": 3,
+    "ORDINAL": 1,
+    "CARDINAL": 5,
+    "ORG": 2,
+    "PERSON": 3,
+    "MONEY": 2
+  },
+  "is_empty": false,
+  "encoding_errors": false,
+  "extracted_at": "2026-04-29T22:15:44.860179+00:00",
+  "source_path": "data/raw/sample_comments.csv"
+}

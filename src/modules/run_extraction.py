@@ -19,6 +19,18 @@ For each ``.json``, ``.jsonl``, and ``.log`` file in ``data/raw/``:
 3. Write the flattened DataFrame as ``<stem>_extracted.csv`` to
    ``data/extracted/``.
 
+Text extraction
+---------------
+For each ``.txt``, ``.pdf``, and ``.eml`` file in ``data/raw/``, and for any
+``.csv`` file whose headers contain a recognisable free-text column (e.g.
+``comment_text``, ``body``, ``content``):
+
+1. Load the file using :meth:`TextExtractor.load_data` to obtain ``raw_text``.
+2. Extract features using :meth:`TextExtractor.extract`.
+3. Write the feature dict as ``<stem>_text_features.json`` to
+   ``data/extracted/``.
+4. Write the raw extracted text as ``<stem>_raw.txt`` to ``data/extracted/``.
+
 Run directly::
 
     PYTHONPATH=. python src/modules/run_extraction.py
@@ -26,12 +38,14 @@ Run directly::
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
 from loguru import logger
 
 from src.modules.semi_structured.profiler import SemiStructuredProfiler
+from src.modules.text.extractor import TextExtractor
 from src.utils import load_config
 
 # ---------------------------------------------------------------------------
@@ -41,8 +55,49 @@ from src.utils import load_config
 RAW_DIR       = Path("data/raw")
 EXTRACTED_DIR = Path("data/extracted")
 
-# File extensions handled by the semi-structured profiler
+# File extensions handled by each extractor
 _SEMI_STRUCTURED_EXTENSIONS = {".json", ".jsonl", ".log"}
+_TEXT_DIRECT_EXTENSIONS     = {".txt", ".pdf", ".eml"}
+
+# Column-name substrings that mark a CSV column as free text
+_TEXT_COLUMN_INDICATORS: frozenset[str] = frozenset(
+    {"text", "body", "content", "comment", "description", "message", "caption", "post", "review"}
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_text_csv(path: Path) -> bool:
+    """Return ``True`` if *path* is a CSV that contains a free-text column.
+
+    Reads only the header row to decide, so the cost is negligible even for
+    large files.  A column is considered free-text when any of the substrings
+    in :data:`_TEXT_COLUMN_INDICATORS` appears in the column name (case-
+    insensitive).  This distinguishes comment/social-data CSVs from numeric
+    order/transaction CSVs that are handled by the structured module.
+
+    Args:
+        path: Path to a ``.csv`` file.
+
+    Returns:
+        ``True`` when at least one header matches a text indicator; ``False``
+        otherwise or when the file cannot be read.
+    """
+    import csv  # noqa: PLC0415
+
+    try:
+        with path.open(newline="", encoding="utf-8") as fh:
+            headers = next(csv.reader(fh), [])
+    except (OSError, StopIteration):
+        return False
+
+    return any(
+        any(indicator in h.lower() for indicator in _TEXT_COLUMN_INDICATORS)
+        for h in headers
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +188,87 @@ def extract_semi_structured(profiler: SemiStructuredProfiler) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
+# Text extraction
+# ---------------------------------------------------------------------------
+
+
+def extract_text(extractor: TextExtractor) -> list[Path]:
+    """Extract text features from text-bearing files and write them to ``data/extracted/``.
+
+    Processes three categories of source file found in ``data/raw/``:
+
+    * ``.txt``, ``.pdf``, ``.eml`` — always treated as text sources.
+    * ``.csv`` — treated as a text source only when :func:`_is_text_csv`
+      returns ``True`` (i.e. the file has at least one free-text column such
+      as ``comment_text`` or ``body``).  Plain order/transaction CSVs handled
+      by the structured module are excluded.
+
+    For each qualifying file, two artefacts are written to ``data/extracted/``:
+
+    * ``<stem>_text_features.json`` — the feature dict from
+      :meth:`~TextExtractor.extract`, augmented with a ``source_path`` key so
+      the quality-check stage can locate the original file for freshness
+      scoring.
+    * ``<stem>_raw.txt`` — the raw extracted text string.
+
+    Args:
+        extractor: An initialised :class:`~TextExtractor` instance.
+
+    Returns:
+        List of ``.json`` feature-file paths written to ``data/extracted/``.
+    """
+    written: list[Path] = []
+
+    # Collect candidates: direct text files + text-bearing CSVs
+    candidates: list[Path] = []
+    for p in sorted(RAW_DIR.iterdir()):
+        suffix = p.suffix.lower()
+        if suffix in _TEXT_DIRECT_EXTENSIONS:
+            candidates.append(p)
+        elif suffix == ".csv" and _is_text_csv(p):
+            candidates.append(p)
+
+    if not candidates:
+        logger.warning(
+            "extract_text: no text source files found in data/raw/ "
+            f"(looked for {_TEXT_DIRECT_EXTENSIONS | {'.csv'}})"
+        )
+        return written
+
+    for raw_path in candidates:
+        dataset_name = raw_path.stem
+        try:
+            raw_text, detected_type = extractor.load_data(str(raw_path))
+            features = extractor.extract(raw_text, dataset_name=dataset_name)
+
+            # Augment with source_path so run_quality_checks.py can use it
+            features["source_path"] = str(raw_path)
+
+            # Write feature dict as JSON
+            json_dest = EXTRACTED_DIR / f"{dataset_name}_text_features.json"
+            with json_dest.open("w", encoding="utf-8") as fh:
+                json.dump(features, fh, indent=2)
+
+            # Write raw extracted text
+            txt_dest = EXTRACTED_DIR / f"{dataset_name}_raw.txt"
+            txt_dest.write_text(raw_text, encoding="utf-8")
+
+            logger.info(
+                f"extract_text: {raw_path.name} (type={detected_type}) | "
+                f"words={features['word_count']} lang={features['language']} "
+                f"→ {json_dest.name}, {txt_dest.name}"
+            )
+            written.append(json_dest)
+
+        except Exception:
+            logger.exception(
+                f"extract_text: failed to process '{raw_path.name}'"
+            )
+
+    return written
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -141,8 +277,9 @@ def main() -> None:
     """Run all extraction steps and report a summary."""
     EXTRACTED_DIR.mkdir(parents=True, exist_ok=True)
 
-    config   = load_config()
-    profiler = SemiStructuredProfiler(config)
+    config    = load_config()
+    profiler  = SemiStructuredProfiler(config)
+    extractor = TextExtractor(config)
 
     logger.info("run_extraction: starting structured extraction")
     structured_files = extract_structured()
@@ -150,10 +287,14 @@ def main() -> None:
     logger.info("run_extraction: starting semi-structured extraction")
     semi_files = extract_semi_structured(profiler)
 
-    total = len(structured_files) + len(semi_files)
+    logger.info("run_extraction: starting text extraction")
+    text_files = extract_text(extractor)
+
+    total = len(structured_files) + len(semi_files) + len(text_files)
     logger.info(
         f"run_extraction: complete — {total} file(s) written to data/extracted/ "
-        f"({len(structured_files)} structured, {len(semi_files)} semi-structured)"
+        f"({len(structured_files)} structured, {len(semi_files)} semi-structured, "
+        f"{len(text_files)} text feature files)"
     )
 
 

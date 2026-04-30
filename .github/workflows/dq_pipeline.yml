@@ -59,6 +59,9 @@ jobs:
       - name: Download spaCy English model
         run: python -m spacy download en_core_web_sm
 
+      - name: Install PyMuPDF
+        run: pip install pymupdf --quiet
+
       - name: Set up DVC
         uses: iterative/setup-dvc@v1
 
@@ -103,7 +106,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest tests/ \
+          pytest tests/test_structured.py tests/test_semi_structured.py tests/test_text.py \
             -v \
             --tb=short \
             --cov=src \

@@ -1,0 +1,22 @@
+{
+  "dataset_name": "sample_document",
+  "char_count": 874,
+  "word_count": 126,
+  "sentence_count": 18,
+  "avg_word_length": 5.9286,
+  "language": "en",
+  "language_confidence": 1.0,
+  "special_char_ratio": 0.016018,
+  "whitespace_ratio": 0.145309,
+  "uppercase_ratio": 0.028649,
+  "entities": {
+    "ORG": 2,
+    "GPE": 2,
+    "CARDINAL": 1,
+    "ORDINAL": 1
+  },
+  "is_empty": false,
+  "encoding_errors": false,
+  "extracted_at": "2026-04-29T22:15:45.131556+00:00",
+  "source_path": "data/raw/sample_document.pdf"
+}

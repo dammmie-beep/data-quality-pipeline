@@ -25,6 +25,17 @@ For each ``_extracted.csv`` file written to ``data/extracted/`` by
 3. Load the ``_extracted.csv`` as a flattened DataFrame.
 4. Validate with :class:`~src.modules.semi_structured.validator.SemiStructuredValidator`.
 
+Text checks
+-----------
+For each ``_text_features.json`` file written to ``data/extracted/`` by
+:mod:`src.modules.run_extraction`:
+
+1. Load the feature dict from JSON.
+2. Collect all feature dicts into a single list (used for the uniqueness check).
+3. Validate each document with :class:`~src.modules.text.validator.TextValidator`,
+   passing the full list as ``all_features`` so duplicate detection can compare
+   across all documents in the run.
+
 All :class:`~src.models.QualityResult` objects are serialised via
 :meth:`~src.models.QualityResult.to_dict` and appended to
 ``reports/quality_results.json``.  Existing results in that file are preserved.
@@ -38,6 +49,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from loguru import logger
@@ -47,6 +59,7 @@ from src.modules.semi_structured.profiler import SemiStructuredProfiler
 from src.modules.semi_structured.validator import SemiStructuredValidator
 from src.modules.structured.profiler import StructuredProfiler
 from src.modules.structured.validator import StructuredValidator
+from src.modules.text.validator import TextValidator
 from src.utils import load_config
 
 # ---------------------------------------------------------------------------
@@ -104,7 +117,7 @@ def _save_results(results: list[dict]) -> None:
 
 
 def run_structured_checks(
-    config: dict,
+    config: dict[str, Any],
 ) -> list[QualityResult]:
     """Run structured quality checks on every CSV file in ``data/raw/``.
 
@@ -179,7 +192,7 @@ def _find_raw_source(extracted_csv: Path) -> Path | None:
 
 
 def run_semi_structured_checks(
-    config: dict,
+    config: dict[str, Any],
 ) -> list[QualityResult]:
     """Run semi-structured quality checks on every ``_extracted.csv`` file.
 
@@ -245,6 +258,87 @@ def run_semi_structured_checks(
 
 
 # ---------------------------------------------------------------------------
+# Text quality checks
+# ---------------------------------------------------------------------------
+
+
+def run_text_checks(
+    config: dict[str, Any],
+) -> list[QualityResult]:
+    """Run text quality checks on every ``_text_features.json`` file.
+
+    Loads all feature dicts first so that the full collection can be passed
+    to :meth:`~TextValidator.check_uniqueness` as ``all_features``, enabling
+    cross-document duplicate detection within a single pipeline run.
+
+    For each feature file:
+
+    1. Load the feature dict from JSON (written by
+       :func:`~src.modules.run_extraction.extract_text`).
+    2. Validate with :class:`~TextValidator`, passing the full ``all_features``
+       list for uniqueness scoring.
+    3. Use the ``source_path`` stored in the feature dict for freshness scoring.
+
+    Args:
+        config: Pipeline configuration dict from :func:`~src.utils.load_config`.
+
+    Returns:
+        List of :class:`~src.models.QualityResult` objects, one per text
+        feature file.
+    """
+    validator = TextValidator(config)
+    results: list[QualityResult] = []
+
+    feature_files = sorted(EXTRACTED_DIR.glob("*_text_features.json"))
+    if not feature_files:
+        logger.warning(
+            "run_text_checks: no *_text_features.json files found in "
+            "data/extracted/"
+        )
+        return results
+
+    # Load all feature dicts upfront for cross-document uniqueness comparison
+    all_features: list[dict[str, Any]] = []
+    for feat_path in feature_files:
+        try:
+            with feat_path.open("r", encoding="utf-8") as fh:
+                all_features.append(json.load(fh))
+        except (json.JSONDecodeError, OSError):
+            logger.warning(
+                f"run_text_checks: could not read '{feat_path.name}' — skipping"
+            )
+            all_features.append({})  # placeholder keeps indices aligned
+
+    for feat_path, features in zip(feature_files, all_features):
+        if not features:
+            continue  # was unreadable
+
+        dataset_name = str(features.get("dataset_name", feat_path.stem))
+        source_path  = str(features.get("source_path", ""))
+
+        try:
+            result = validator.validate(
+                features,
+                dataset_name=dataset_name,
+                source_path=source_path,
+                all_features=all_features,
+            )
+            result.metadata["features_file"] = str(feat_path)
+            results.append(result)
+
+            logger.info(
+                f"run_text_checks: {dataset_name} | "
+                f"score={result.overall_score:.1f} passed={result.passed}"
+            )
+        except Exception:
+            logger.exception(
+                f"run_text_checks: failed for '{feat_path.name}'"
+            )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -261,7 +355,10 @@ def main() -> None:
     logger.info("run_quality_checks: starting semi-structured checks")
     semi_results = run_semi_structured_checks(config)
 
-    all_new = structured_results + semi_results
+    logger.info("run_quality_checks: starting text checks")
+    text_results = run_text_checks(config)
+
+    all_new = structured_results + semi_results + text_results
 
     # Preserve any results written by previous pipeline runs
     existing = _load_existing_results()
@@ -272,7 +369,9 @@ def main() -> None:
     fail_count = len(all_new) - pass_count
     logger.info(
         f"run_quality_checks: complete — {len(all_new)} dataset(s) checked | "
-        f"passed={pass_count} failed={fail_count}"
+        f"passed={pass_count} failed={fail_count} "
+        f"({len(structured_results)} structured, {len(semi_results)} semi-structured, "
+        f"{len(text_results)} text)"
     )
 
 

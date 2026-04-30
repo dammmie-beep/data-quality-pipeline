@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sample_report",
+  "char_count": 2113,
+  "word_count": 296,
+  "sentence_count": 38,
+  "avg_word_length": 6.1014,
+  "language": "en",
+  "language_confidence": 1.0,
+  "special_char_ratio": 0.017984,
+  "whitespace_ratio": 0.145291,
+  "uppercase_ratio": 0.245564,
+  "entities": {
+    "DATE": 5,
+    "PERSON": 5,
+    "ORG": 11,
+    "CARDINAL": 7,
+    "GPE": 8,
+    "FAC": 1,
+    "MONEY": 3,
+    "TIME": 1
+  },
+  "is_empty": false,
+  "encoding_errors": false,
+  "extracted_at": "2026-04-29T22:15:45.294785+00:00",
+  "source_path": "data/raw/sample_report.txt"
+}
